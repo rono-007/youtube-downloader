@@ -340,4 +340,4 @@ def get_downloaded_file(task_id):
 # Run the Flask app
 if __name__ == '__main__':
     # Run on a different port than your frontend (e.g., 5000)
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=5000)
