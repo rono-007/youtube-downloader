@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: "Geist";
+            src: url("https://assets.codepen.io/605876/GeistVF.ttf") format("truetype");
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --size: 20px;
+        }
+
+        body {
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            background: hsl(0 0% 6%); /* New background color */
+            font-family: 'Inter', sans-serif; /* Keep Inter as primary, Geist for specific elements if needed */
+        }
+
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Custom button active state for a 'pressed' effect */
+        .btn-active:active {
+            transform: scale(0.98);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Spinner animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #a770ef; /* Purple color for spinner */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        /* Full-screen Loading Overlay */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8); /* Darker overlay */
+            display: flex; /* Default display when active */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            color: white;
+            text-align: center;
+        }
+
+        /* New background animation element */
+        .el {
+            position: fixed; /* Make it cover the entire viewport */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: conic-gradient(from 180deg at 50% 70%,hsla(0,0%,98%,1) 0deg,#eec32d 72.0000010728836deg,#ec4b4b 144.0000021457672deg,#709ab9 216.00000858306885deg,#4dffbf 288.0000042915344deg,hsla(0,0%,98%,1) 1turn);
+            mask:
+                radial-gradient(circle at 50% 50%, white 2px, transparent 2.5px) 50% 50% / var(--size) var(--size),
+                url("https://assets.codepen.io/605876/noise-mask.png") 256px 50% / 256px 256px;
+            mask-composite: intersect;
+            animation: flicker 20s infinite linear;
+            z-index: -1; /* Place it behind other content */
+        }
+            
+        @keyframes flicker {
+            to {
+                mask-position: 50% 50%, 0 50%;
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <!-- New background animation element -->
+    <div class="el"></div>
+
+    <div class="p-8 rounded-3xl w-full max-w-4xl text-center transition-all duration-300 ease-in-out">
+        <h1 class="text-4xl font-extrabold text-white mb-6 tracking-tight leading-tight">
+            <span class="text-purple-300">YouTube</span> Video Downloader
+        </h1>
+        <p class="text-base text-gray-200 mb-8 font-medium">
+            Paste your YouTube video URL below to get started. Fast, Free & Easy!
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
+            <input
+                type="text"
+                id="youtubeUrl"
+                placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                class="flex-grow p-3 border border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-purple-300 text-gray-800 text-base shadow-lg w-full sm:w-auto transition-all duration-300 ease-in-out bg-white bg-opacity-80"
+            >
+            <button
+                id="getVideoInfoBtn"
+                class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300 focus:ring-opacity-75 w-full sm:w-auto btn-active"
+            >
+                Get Video Info
+            </button>
+        </div>
+
+        <div id="videoInfoSection" class="hidden mt-8 p-6 rounded-2xl shadow-inner transition-all duration-500 ease-in-out opacity-0 translate-y-5 bg-white bg-opacity-10 backdrop-blur-sm border border-gray-700">
+            <h2 class="text-2xl font-bold text-white mb-5">Video Details</h2>
+            <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
+                <div class="flex-shrink-0 w-full md:w-1/3">
+                    <img
+                        id="videoThumbnail"
+                        src="https://placehold.co/480x270/e0e0e0/555555?text=Video+Thumbnail"
+                        alt="Video Thumbnail"
+                        class="w-full h-auto rounded-lg shadow-lg border border-gray-600 object-cover aspect-video"
+                        onerror="this.onerror=null;this.src='https://placehold.co/480x270/e0e0e0/555555?text=Error+Loading+Image';"
+                    >
+                </div>
+                <div class="flex-grow text-left w-full md:w-2/3">
+                    <p id="videoTitle" class="text-xl font-semibold text-white mb-4 break-words leading-snug">
+                        Dummy Video Title Goes Here - A Very Long Title to Test Layout Responsiveness and Text Wrapping
+                    </p>
+
+                    <div class="mb-5">
+                        <label class="block text-gray-200 text-md font-semibold mb-2">Select Format:</label>
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <label class="inline-flex items-center cursor-pointer p-3 rounded-lg shadow-sm border border-gray-600 hover:border-purple-400 transition-colors duration-200 ease-in-out bg-white bg-opacity-10 backdrop-blur-sm">
+                                <input type="radio" name="format" value="mp4" checked class="form-radio text-purple-600 h-5 w-5 focus:ring-purple-500" id="mp4Option">
+                                <span class="ml-3 text-white font-medium">MP4 (Video)</span>
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer p-3 rounded-lg shadow-sm border border-gray-600 hover:border-purple-400 transition-colors duration-200 ease-in-out bg-white bg-opacity-10 backdrop-blur-sm">
+                                <input type="radio" name="format" value="mp3" class="form-radio text-purple-600 h-5 w-5 focus:ring-purple-500" id="mp3Option">
+                                <span class="ml-3 text-white font-medium">MP3 (Audio)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label for="resolutionSelect" class="block text-gray-200 text-md font-semibold mb-2">
+                            Select Quality:
+                        </label>
+                        <select
+                            id="resolutionSelect"
+                            class="block w-full p-3 border border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-800 bg-white bg-opacity-80 appearance-none pr-8 cursor-pointer"
+                            style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22currentColor%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.293%207.293a1%201%200%20011.414%200L10%2010.586l3.293-3.293a1%201%200%20111.414%201.414l-4%204a1%201%200%2001-1.414%200l-4-4a1%201%200%20010-1.414z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1.5em 1.5em;"
+                        >
+                            </select>
+                    </div>
+
+                    <button
+                        id="downloadBtn"
+                        class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-bold py-3 px-6 rounded-xl shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 focus:ring-opacity-75 w-full btn-active"
+                    >
+                        Download Video
+                    </button>
+
+                    <div id="downloadProgressContainer" class="hidden mt-4 text-left">
+                        <p id="downloadStatusMessage" class="text-gray-200 text-sm mt-2 flex items-center justify-center"></p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div id="messageBox" class=" bg-black text-white hidden  rounded-lg  font-semibold shadow-md b" role="alert">
+            <p id="messageText"></p>
+        </div>
+
+    </div>
+
+    <!-- Full-screen Loading Overlay -->
+    <div id="loadingOverlay" style="display: none;">
+        <h2 class="text-4xl font-extrabold mb-8 text-white">Downloading...</h2>
+        <p id="adFreeWaitMessage" class="text-white text-3xl font-bold mt-8">
+            <div class="spinner"></div>It's Ad-Free so you have to wait...
+        </p>
+    </div>
+
+
+    <script>
+        // --- Configuration ---
+        const BACKEND_URL = 'http://127.0.0.1:5000'; // **IMPORTANT**: Change this if your backend runs on a different address/port
+
+        // --- Get DOM elements ---
+        const getVideoInfoBtn = document.getElementById('getVideoInfoBtn');
+        const videoInfoSection = document.getElementById('videoInfoSection');
+        const videoThumbnail = document.getElementById('videoThumbnail');
+        const videoTitle = document.getElementById('videoTitle');
+        const mp4Option = document.getElementById('mp4Option');
+        const mp3Option = document.getElementById('mp3Option');
+        const resolutionSelect = document.getElementById('resolutionSelect');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const youtubeUrlInput = document.getElementById('youtubeUrl');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const closeMessageBox = document.getElementById('closeMessageBox');
+        const downloadProgressContainer = document.getElementById('downloadProgressContainer');
+        const downloadStatusMessage = document.getElementById('downloadStatusMessage');
+
+        // Elements for loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const adFreeWaitMessage = document.getElementById('adFreeWaitMessage');
+
+        let currentDownloadTaskId = null; // To keep track of the active download task
+        let pollingInterval = null; // To store the interval ID for polling
+        let availableFormats = { mp4: [], mp3: [] }; // Store formats fetched from backend
+
+        // --- General UI Functions ---
+        /**
+         * Displays a custom message box.
+         * @param {string} message - The message to display.
+         * @param {string} type - The type of message (e.g., 'success', 'error', 'info').
+         */
+        function showMessageBox(message, type) {
+            messageText.textContent = message;
+            messageBox.className = 'mt-8 p-4 rounded-xl text-white font-semibold shadow-xl'; // Reset classes and add new shadow
+            if (type === 'success') {
+                messageBox.classList.add('bg-black-500');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-500');
+            } else {
+                messageBox.classList.add('bg-black-500'); // Default info
+            }
+            messageBox.classList.remove('hidden');
+            messageBox.classList.add('animate-fade-in'); // Add fade-in animation
+        }
+
+        /**
+         * Hides the custom message box.
+         */
+        function hideMessageBox() {
+            messageBox.classList.add('hidden');
+            messageBox.classList.remove('animate-fade-in');
+        }
+
+        /**
+         * Shows the full-screen loading overlay.
+         */
+        function showLoadingOverlay() {
+            loadingOverlay.style.display = 'flex'; // Set display to flex to show it
+            adFreeWaitMessage.classList.remove('hidden'); // Ensure the message is visible
+        }
+
+        /**
+         * Hides the full-screen loading overlay.
+         */
+        function hideLoadingOverlay() {
+            loadingOverlay.style.display = 'none'; // Set display to none to hide it
+            adFreeWaitMessage.classList.add('hidden'); // Hide the message when overlay is hidden
+        }
+
+        /**
+         * Populates the resolution/bitrate dropdown based on the selected format
+         * using the 'availableFormats' data fetched from the backend.
+         */
+        function populateResolutionOptions() {
+            const selectedFormat = document.querySelector('input[name="format"]:checked').value;
+            resolutionSelect.innerHTML = ''; // Clear existing options
+
+            const options = (selectedFormat === 'mp4')
+                ? availableFormats.mp4.map(fmt => fmt.quality)
+                : availableFormats.mp3;
+
+            if (options.length === 0) {
+                const optElement = document.createElement('option');
+                optElement.value = '';
+                optElement.textContent = `No ${selectedFormat.toUpperCase()} options available`;
+                optElement.disabled = true;
+                resolutionSelect.appendChild(optElement);
+                downloadBtn.disabled = true; // Disable download if no options
+            } else {
+                options.forEach(option => {
+                    const optElement = document.createElement('option');
+                    optElement.value = option;
+                    optElement.textContent = option;
+                    resolutionSelect.appendChild(optElement);
+                });
+                downloadBtn.disabled = false; // Enable download if options are available
+            }
+
+            // Update download button text based on selected format
+            downloadBtn.textContent = `Download ${selectedFormat === 'mp4' ? 'Video' : 'Audio'}`;
+        }
+
+        /**
+         * Fetches video information from the backend.
+         */
+        getVideoInfoBtn.addEventListener('click', async () => {
+            const url = youtubeUrlInput.value.trim();
+            if (!url) {
+                showMessageBox('Please enter a YouTube URL.', 'error');
+                return;
+            }
+
+            // Simple URL validation (can be more robust)
+            if (!url.includes('youtube.com/watch?v=') && !url.includes('youtu.be/')) {
+                showMessageBox('Please enter a valid YouTube video URL (e.g., youtube.com/watch?v=...).', 'error');
+                return;
+            }
+
+            hideMessageBox(); // Hide any previous messages
+            downloadProgressContainer.classList.add('hidden'); // Hide progress container
+            downloadBtn.disabled = true; // Disable button while fetching info
+
+            // Clear any existing polling interval if a previous download was active
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+
+            try {
+                showMessageBox('Fetching video information...', 'info');
+                const response = await fetch(`${BACKEND_URL}/get_video_info`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    videoTitle.textContent = data.title;
+                    videoThumbnail.src = data.thumbnail;
+                    availableFormats.mp4 = data.available_formats.video || [];
+                    availableFormats.mp3 = data.available_formats.audio || [];
+
+                    videoInfoSection.classList.remove('hidden');
+                    videoInfoSection.classList.remove('opacity-0', 'translate-y-5');
+                    videoInfoSection.classList.add('animate-fade-in');
+                    hideMessageBox(); // Hide info message on success
+                    populateResolutionOptions(); // Populate options based on fetched data
+                } else {
+                    showMessageBox(`Error: ${data.error || 'Failed to get video info.'}`, 'error');
+                    videoInfoSection.classList.add('hidden'); // Hide section on error
+                }
+            } catch (error) {
+                showMessageBox(`Network error: ${error.message}. Make sure the backend is running.`, 'error');
+                videoInfoSection.classList.add('hidden'); // Hide section on error
+            } finally {
+                // downloadBtn state is handled by populateResolutionOptions
+            }
+        });
+
+        // Event listeners for format radio buttons
+        mp4Option.addEventListener('change', populateResolutionOptions);
+        mp3Option.addEventListener('change', populateResolutionOptions);
+
+        /**
+         * Initiates the download process and starts polling for status.
+         */
+        downloadBtn.addEventListener('click', async () => {
+            const selectedFormat = document.querySelector('input[name="format"]:checked').value;
+            const selectedQuality = resolutionSelect.value;
+            const videoUrl = youtubeUrlInput.value.trim();
+
+            if (!videoUrl || videoInfoSection.classList.contains('hidden')) {
+                showMessageBox('Please get video info first by entering a URL.', 'error');
+                return;
+            }
+            if (!selectedQuality) {
+                showMessageBox('Please select a quality option.', 'error');
+                return;
+            }
+
+            hideMessageBox(); // Hide any previous messages
+            downloadProgressContainer.classList.remove('hidden'); // Show progress container
+            downloadBtn.disabled = true; // Disable button during download
+
+            // Show the full-screen loading overlay
+            showLoadingOverlay();
+
+            // Clear any existing polling interval
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/download`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: videoUrl,
+                        format: selectedFormat,
+                        quality: selectedQuality
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentDownloadTaskId = data.taskId;
+                    // Start polling for download status
+                    pollingInterval = setInterval(pollDownloadStatus, 200);
+                } else {
+                    showMessageBox(`Error initiating download: ${data.error || 'Unknown error.'}`, 'error');
+                    downloadBtn.disabled = false; // Re-enable button on error
+                    hideLoadingOverlay(); // Hide overlay on error
+                    downloadProgressContainer.classList.add('hidden'); // Hide progress container on error
+                }
+            } catch (error) {
+                showMessageBox(`Network error: ${error.message}. Make sure the backend is running.`, 'error');
+                downloadBtn.disabled = false; // Re-enable button on error
+                    hideLoadingOverlay(); // Hide overlay on error
+                downloadProgressContainer.classList.add('hidden'); // Hide progress container on error
+            }
+        });
+
+        /**
+         * Polls the backend for download status updates.
+         */
+        async function pollDownloadStatus() {
+            if (!currentDownloadTaskId) {
+                clearInterval(pollingInterval);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/download_status/${currentDownloadTaskId}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.status === 'completed') {
+                        clearInterval(pollingInterval);
+                        hideLoadingOverlay(); // Hide the overlay
+
+                        // Removed: showMessageBox('Download completed successfully!', 'success');
+                        downloadStatusMessage.innerHTML = ''; // Clear previous status
+
+                        // Hide the original download button
+                        downloadBtn.classList.add('hidden');
+
+                        // Create a new button for download and center it
+                        const downloadFileButton = document.createElement('button');
+                        downloadFileButton.textContent = 'Download File';
+                        downloadFileButton.classList.add(
+                            'mt-3',
+                            'bg-blue-600',
+                            'hover:bg-blue-700',
+                            'text-white',
+                            'font-bold',
+                            'py-2',
+                            'px-4',
+                            'rounded-lg',
+                            'shadow-md',
+                            'transition-all',
+                            'duration-300',
+                            'ease-in-out',
+                            'transform',
+                            'hover:scale-105',
+                            'focus:outline-none',
+                            'focus:ring-2',
+                            'focus:ring-blue-500',
+                            'focus:ring-opacity-75',
+                            'btn-active',
+                            'mx-auto' // Add mx-auto for horizontal centering
+                        );
+                        downloadFileButton.onclick = () => {
+                            window.location.href = `${BACKEND_URL}/get_file/${currentDownloadTaskId}`;
+                        };
+                        // Ensure the container is a flexbox to center the button
+                        downloadProgressContainer.classList.add('flex', 'justify-center');
+                        downloadStatusMessage.appendChild(downloadFileButton);
+
+                        // The main download button is now hidden, no need to re-enable it here.
+
+                    } else if (data.status === 'failed') {
+                        clearInterval(pollingInterval);
+                        hideLoadingOverlay(); // Hide the overlay
+
+                        showMessageBox(`Download failed: ${data.error || 'Unknown error.'}`, 'error');
+                        downloadStatusMessage.textContent = `Download failed: ${data.error || 'Unknown error.'}`;
+                        downloadBtn.disabled = false; // Re-enable main download button
+                    } else {
+                        // The "It's Free so you have to wait" message is already shown by showLoadingOverlay()
+                        // No need to update innerHTML here repeatedly.
+                    }
+                } else {
+                    clearInterval(pollingInterval);
+                    hideLoadingOverlay(); // Hide the overlay
+
+                    showMessageBox(`Error checking status: ${data.error || 'Unknown error.'}`, 'error');
+                    downloadBtn.disabled = false; // Re-enable main download button
+                }
+            } catch (error) {
+                clearInterval(pollingInterval);
+                hideLoadingOverlay(); // Hide the overlay
+
+                showMessageBox(`Network error during status check: ${error.message}.`, 'error');
+                downloadBtn.disabled = false; // Re-enable main download button
+            }
+        }
+
+        // Event listener for closing the message box
+        closeMessageBox.addEventListener('click', hideMessageBox);
+
+        // Add CSS for fade-in animation
+        const style = document.createElement('style');
+        style.innerHTML += `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in {
+                animation: fadeIn 0.5s ease-out forwards;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Initial population of resolution options when the page loads (will be empty until info is fetched)
+        document.addEventListener('DOMContentLoaded', () => {
+            populateResolutionOptions(); // Call once to set initial state (e.g., disable download button)
+        });
+    </script>
+</body>
+</html>
