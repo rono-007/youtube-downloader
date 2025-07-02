@@ -8,7 +8,11 @@ import queue
 import time
 import re
 import requests # Added for Gemini API calls
+from flask import send_from_directory
 
+@app.route('/')
+def index():
+    return send_from_directory('templates', 'index.html')
 # Initialize the Flask application
 app = Flask(__name__)
 # Enable CORS for all routes, allowing your frontend to communicate with this backend
