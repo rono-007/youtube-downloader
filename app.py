@@ -266,6 +266,9 @@ def get_video_info():
             'skip_download': True,
             'force_generic_extractor': True, # Helps with some URLs
             'no_warnings': True,
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            }
         }
         # Add ffmpeg location if specified for info extraction (though usually not needed here)
         if FFMPEG_PATH:
